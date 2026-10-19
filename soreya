@@ -45,7 +45,7 @@ local castDelay = 0.3       -- Jeda dari melempar hingga minigame aktif
 local reelingDuration = 1.8 -- Durasi waktu spam tap saat menarik ikan agar bar penuh
 local loopDelay = 0.4       -- Jeda antar putaran mancing
 local cpDelay = 0.5         -- Jeda antar checkpoint (dapat di-setting)
-local summitWaitTime = 5.0  -- Jeda setelah sampai di summit sebelum mengulang dari CP 1 (dapat di-setting)
+local summitWaitTime = 5.0  -- Jeda di koordinat ekstra setelah summit sebelum mengulang dari CP 1 (dapat di-setting)
 
 -- Daftar Koordinat Tetap Checkpoint 1 - 20 & Summit
 local CheckpointCoords = {
@@ -266,11 +266,11 @@ task.spawn(function()
     end
 end)
 
--- // Background Loop Auto Checkpoint 1 sampai 20 & Summit + Extra Koordinat
+-- // Background Loop Auto Checkpoint 1-20 -> Summit -> SummitExtra (Delay di Sini) -> Ulang dari CP 1
 task.spawn(function()
     while true do
         if autoCheckpointEnabled then
-            -- Teleport dari Checkpoint 1 sampai 20 secara berurutan
+            -- 1. Teleport dari Checkpoint 1 sampai 20 secara berurutan
             for i = 1, 20 do
                 if not autoCheckpointEnabled then break end
                 local key = "Checkpoint " .. i
@@ -280,12 +280,18 @@ task.spawn(function()
                 task.wait(cpDelay)
             end
 
-            -- Teleport ke Summit
+            -- 2. Teleport ke Summit
             if autoCheckpointEnabled and CheckpointCoords["Summit"] then
                 teleportToPosition(CheckpointCoords["Summit"])
             end
+            task.wait(cpDelay)
 
-            -- Delay setelah sampai di Summit (sesuai settingan user)
+            -- 3. Teleport ke Koordinat Ekstra setelah Summit
+            if autoCheckpointEnabled and CheckpointCoords["SummitExtra"] then
+                teleportToPosition(CheckpointCoords["SummitExtra"])
+            end
+
+            -- 4. Delay berjalan di koordinat ekstra setelah summit (sesuai settingan summitWaitTime)
             local elapsedSummitWait = 0
             while elapsedSummitWait < summitWaitTime do
                 if not autoCheckpointEnabled then break end
@@ -293,13 +299,7 @@ task.spawn(function()
                 elapsedSummitWait = elapsedSummitWait + 0.1
             end
 
-            -- Teleport ke Koordinat Tambahan setelah Summit
-            if autoCheckpointEnabled and CheckpointCoords["SummitExtra"] then
-                teleportToPosition(CheckpointCoords["SummitExtra"])
-            end
-
-            -- Jeda sejenak sebelum mengulang kembali dari Checkpoint 1
-            task.wait(cpDelay)
+            -- Setelah delay selesai, loop akan kembali mengulang dari Checkpoint 1
         else
             task.wait(0.5)
         end
@@ -455,7 +455,7 @@ TabSell:Input({
 -- Toggle Utama Auto Checkpoint Loop
 TabTeleport:Toggle({
     Title = "Auto Teleport Checkpoint (1-20 & Summit)",
-    Desc = "Otomatis teleport berurutan dari CP 1 sampai 20, ke Summit, lalu ke area ekstra",
+    Desc = "Otomatis teleport berurutan dari CP 1-20, Summit, ke koordinat ekstra lalu delay di sana",
     Icon = "repeat",
     Value = false,
     Callback = function(state)
@@ -487,10 +487,10 @@ TabTeleport:Input({
     end
 })
 
--- Input Pengaturan Delay Setelah Summit
+-- Input Pengaturan Delay di Koordinat Ekstra Setelah Summit
 TabTeleport:Input({
-    Title = "Delay di Summit (Detik)",
-    Desc = "Berapa lama menunggu di Summit sebelum lanjut ke koordinat berikutnya",
+    Title = "Delay di Koordinat Ekstra (Detik)",
+    Desc = "Berapa lama menunggu di koordinat ekstra setelah summit sebelum mengulang dari CP 1",
     Value = tostring(summitWaitTime),
     Placeholder = "Contoh: 5...",
     Callback = function(text)
@@ -498,7 +498,7 @@ TabTeleport:Input({
         if num and num >= 0 then
             summitWaitTime = num
             WindUI:Notify({
-                Title = "Delay Summit Diubah",
+                Title = "Delay Ekstra Diubah",
                 Content = "Set ke: " .. tostring(num) .. "s",
                 Duration = 2,
             })
