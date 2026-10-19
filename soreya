@@ -117,7 +117,7 @@ local function doAutoFish()
 
     local castEvent = remotes:FindFirstChild("CastEvent")
     local miniGameRemote = remotes:FindFirstChild("MiniGame")
-    if not castEvent || not miniGameRemote then return end
+    if not castEvent or not miniGameRemote then return end
 
     -- Step 1: Lempar Pancingan dengan Parameter 99 (Perfect Cast)
     pcall(function()
@@ -285,7 +285,7 @@ task.spawn(function()
                 teleportToPosition(CheckpointCoords["Summit"])
             end
 
-            -- Delay 5 detik setelah sampai di Summit (atau sesuai settingan user)
+            -- Delay setelah sampai di Summit (sesuai settingan user)
             local elapsedSummitWait = 0
             while elapsedSummitWait < summitWaitTime do
                 if not autoCheckpointEnabled then break end
@@ -462,7 +462,7 @@ TabTeleport:Toggle({
         autoCheckpointEnabled = state
         WindUI:Notify({
             Title = "Auto Checkpoint",
-            Content = state and "Diaktifkan (Loop Berjalan)!" | "Dimatikan!",
+            Content = state and "Diaktifkan (Loop Berjalan)!" or "Dimatikan!",
             Duration = 2,
         })
     end
