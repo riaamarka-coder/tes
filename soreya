@@ -1,0 +1,558 @@
+-- // 1. Load WindUI Library
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+-- // 2. Buat Window Utama
+local Window = WindUI:CreateWindow({
+    Title = "Auto Fish Hub [Master Pro]",
+    Icon = "fish",
+    Author = "Auto Script Pro",
+})
+
+-- // 3. Buat Tab Utama
+local TabMain = Window:Tab({
+    Title = "Main Feature",
+    Icon = "bird",
+    Locked = false,
+})
+
+-- // 4. Buat Tab Khusus Sell / Toko
+local TabSell = Window:Tab({
+    Title = "Shop & Sell",
+    Icon = "dollar-sign",
+    Locked = false,
+})
+
+-- // 5. Buat Tab Khusus Teleport Checkpoint
+local TabTeleport = Window:Tab({
+    Title = "Teleport Checkpoint",
+    Icon = "map-pin",
+    Locked = false,
+})
+
+-- // Services & Variables
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+local autoFishEnabled = false
+local autoClaimEnabled = false
+local autoSellEnabled = false
+local autoCheckpointEnabled = false -- Status Toggle Auto Checkpoint Loop
+
+local sellInterval = 60     -- Interval auto sell dalam detik
+local castDelay = 0.3       -- Jeda dari melempar hingga minigame aktif
+local reelingDuration = 1.8 -- Durasi waktu spam tap saat menarik ikan agar bar penuh
+local loopDelay = 0.4       -- Jeda antar putaran mancing
+local cpDelay = 0.5         -- Jeda antar checkpoint (dapat di-setting)
+local summitWaitTime = 5.0  -- Jeda setelah sampai di summit sebelum mengulang dari CP 1 (dapat di-setting)
+
+-- Daftar Koordinat Tetap Checkpoint 1 - 20 & Summit
+local CheckpointCoords = {
+    ["Checkpoint 1"] = Vector3.new(463.76, 458.33, -8945.72),
+    ["Checkpoint 2"] = Vector3.new(449.50, 503.00, -9568.00),
+    ["Checkpoint 3"] = Vector3.new(398.28, 643.00, -10113.53),
+    ["Checkpoint 4"] = Vector3.new(486.50, 652.00, -10681.00),
+    ["Checkpoint 5"] = Vector3.new(1088.50, 738.50, -11156.50),
+    ["Checkpoint 6"] = Vector3.new(973.69, 749.00, -11808.90),
+    ["Checkpoint 7"] = Vector3.new(391.50, 899.00, -11839.00),
+    ["Checkpoint 8"] = Vector3.new(-325.87, 861.78, -11738.49),
+    ["Checkpoint 9"] = Vector3.new(-869.70, 867.10, -11737.40),
+    ["Checkpoint 10"] = Vector3.new(-1281.53, 871.23, -12093.62),
+    ["Checkpoint 11"] = Vector3.new(-1310.60, 903.26, -12834.42),
+    ["Checkpoint 12"] = Vector3.new(-2326.69, 927.82, -12672.86),
+    ["Checkpoint 13"] = Vector3.new(-2309.10, 931.09, -11856.90),
+    ["Checkpoint 14"] = Vector3.new(-2444.76, 975.77, -11057.50),
+    ["Checkpoint 15"] = Vector3.new(-3480.15, 995.51, -11014.89),
+    ["Checkpoint 16"] = Vector3.new(-4225.70, 1015.00, -11018.01),
+    ["Checkpoint 17"] = Vector3.new(-4650.55, 1094.40, -11665.26),
+    ["Checkpoint 18"] = Vector3.new(-5543.91, 1115.62, -11651.75),
+    ["Checkpoint 19"] = Vector3.new(-6766.57, 1109.15, -11507.14),
+    ["Checkpoint 20"] = Vector3.new(-6761.15, 1117.65, -10800.56),
+    ["Summit"] = Vector3.new(-6767.21, 1343.40, -10082.37),
+    ["SummitExtra"] = Vector3.new(-6837.13, 1311.75, -9903.00)
+}
+
+-- // Fungsi Otomatis Mencari Pancingan (Multi-Rod Support)
+local function getEquippedRod()
+    local character = LocalPlayer.Character
+    if not character then return nil end
+
+    -- 1. Cari pancingan yang sedang dipegang di karakter
+    for _, tool in ipairs(character:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Mechanics") and tool.Mechanics:FindFirstChild("Remotes") then
+            return tool
+        end
+    end
+
+    -- 2. Jika di Backpack, auto-equip ke karakter dengan aman
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Mechanics") and tool.Mechanics:FindFirstChild("Remotes") then
+            if humanoid then
+                pcall(function()
+                    humanoid:EquipTool(tool)
+                end)
+            else
+                tool.Parent = character
+            end
+            task.wait(0.2)
+            return tool
+        end
+    end
+
+    return nil
+end
+
+-- // Fungsi Utama Memancing (Perfect Cast 99 + Real-time MiniGame Tap)
+local function doAutoFish()
+    if not autoFishEnabled then return end
+    
+    local rod = getEquippedRod()
+    if not rod then return end
+
+    local mechanics = rod:FindFirstChild("Mechanics")
+    local remotes = mechanics and mechanics:FindFirstChild("Remotes")
+    if not remotes then return end
+
+    local castEvent = remotes:FindFirstChild("CastEvent")
+    local miniGameRemote = remotes:FindFirstChild("MiniGame")
+    if not castEvent || not miniGameRemote then return end
+
+    -- Step 1: Lempar Pancingan dengan Parameter 99 (Perfect Cast)
+    pcall(function()
+        castEvent:FireServer(true)
+        task.wait(0.05)
+        if not autoFishEnabled then return end
+        castEvent:FireServer(
+            false,
+            99, -- Nilai 99 untuk lemparan sempurna (Perfect)
+            Vector3.new(0.13821893930435181, 0, 0.99040168523788452)
+        )
+    end)
+
+    -- Step 2: Efek Visual Tanda Seru Bersama (Opsional, dilindungi pcall)
+    pcall(function()
+        local tandaSeru = ReplicatedStorage:FindFirstChild("TandaSeruBersama")
+        if tandaSeru then
+            tandaSeru:FireServer(
+                Color3.new(0.3333333432674408, 0.63529413938522339, 1),
+                Color3.new(0.078431375324726105, 0.078431375324726105, 0.078431375324726105),
+                ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.new(0.3333333432674408, 0.63529413938522339, 1)),
+                    ColorSequenceKeypoint.new(1, Color3.new(0.3333333432674408, 0.63529413938522339, 1))
+                }),
+                1.5
+            )
+        end
+    end)
+
+    -- Step 3: Jeda hingga ikan menyangkut / bar minigame muncul
+    local elapsedWait = 0
+    while elapsedWait < castDelay do
+        if not autoFishEnabled then return end
+        task.wait(0.05)
+        elapsedWait = elapsedWait + 0.05
+    end
+
+    -- Step 4: Real-time Continuous Tap/Spam Bar MiniGame
+    local startTime = tick()
+    while tick() - startTime < reelingDuration do
+        if not autoFishEnabled then break end
+        
+        pcall(function()
+            miniGameRemote:FireServer(true)
+        end)
+        
+        task.wait(0.02)
+    end
+    
+    -- Final trigger untuk memastikan sukses
+    pcall(function()
+        if autoFishEnabled then
+            miniGameRemote:FireServer(true)
+        end
+    end)
+end
+
+-- // Fungsi Menjual Semua Ikan (Menggunakan InfoJual & JualSemua)
+local function executeSell()
+    local success = pcall(function()
+        local mancingRemote = ReplicatedStorage:FindFirstChild("Remote") 
+            and ReplicatedStorage.Remote:FindFirstChild("Mancing")
+        
+        if not mancingRemote then return false end
+
+        local infoJual = mancingRemote:FindFirstChild("InfoJual")
+        local jualSemua = mancingRemote:FindFirstChild("JualSemua")
+        
+        local executed = false
+
+        if infoJual then
+            pcall(function()
+                infoJual:InvokeServer("semua")
+                executed = true
+            end)
+        end
+
+        if jualSemua then
+            pcall(function()
+                jualSemua:InvokeServer()
+                executed = true
+            end)
+        end
+
+        return executed
+    end)
+    return success
+end
+
+-- // Fungsi Teleport Berdasarkan Vector3
+local function teleportToPosition(pos)
+    local success = pcall(function()
+        local character = LocalPlayer.Character
+        if not character then return false end
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return false end
+
+        hrp.CFrame = CFrame.new(pos)
+        return true
+    end)
+    return success
+end
+
+-- // Background Loop Auto Fish
+task.spawn(function()
+    while true do
+        if autoFishEnabled then
+            local success, err = pcall(doAutoFish)
+            if not success then
+                task.wait(1)
+            end
+            task.wait(loopDelay)
+        else
+            task.wait(0.3)
+        end
+    end
+end)
+
+-- // Background Loop Auto Claim Inventory (Ambil Semua)
+task.spawn(function()
+    while true do
+        if autoClaimEnabled then
+            pcall(function()
+                local remoteFolder = ReplicatedStorage:FindFirstChild("Remote")
+                local inventarisFolder = remoteFolder and remoteFolder:FindFirstChild("Inventaris")
+                local ambilSemua = inventarisFolder and inventarisFolder:FindFirstChild("AmbilSemua")
+            
+                if ambilSemua then
+                    ambilSemua:InvokeServer()
+                end
+            end)
+        end
+        task.wait(2.5)
+    end
+end)
+
+-- // Background Loop Auto Sell Berdasarkan Timer
+task.spawn(function()
+    while true do
+        if autoSellEnabled then
+            pcall(function()
+                executeSell()
+            end)
+        end
+        task.wait(sellInterval)
+    end
+end)
+
+-- // Background Loop Auto Checkpoint 1 sampai 20 & Summit + Extra Koordinat
+task.spawn(function()
+    while true do
+        if autoCheckpointEnabled then
+            -- Teleport dari Checkpoint 1 sampai 20 secara berurutan
+            for i = 1, 20 do
+                if not autoCheckpointEnabled then break end
+                local key = "Checkpoint " .. i
+                if CheckpointCoords[key] then
+                    teleportToPosition(CheckpointCoords[key])
+                end
+                task.wait(cpDelay)
+            end
+
+            -- Teleport ke Summit
+            if autoCheckpointEnabled and CheckpointCoords["Summit"] then
+                teleportToPosition(CheckpointCoords["Summit"])
+            end
+
+            -- Delay 5 detik setelah sampai di Summit (atau sesuai settingan user)
+            local elapsedSummitWait = 0
+            while elapsedSummitWait < summitWaitTime do
+                if not autoCheckpointEnabled then break end
+                task.wait(0.1)
+                elapsedSummitWait = elapsedSummitWait + 0.1
+            end
+
+            -- Teleport ke Koordinat Tambahan setelah Summit
+            if autoCheckpointEnabled and CheckpointCoords["SummitExtra"] then
+                teleportToPosition(CheckpointCoords["SummitExtra"])
+            end
+
+            -- Jeda sejenak sebelum mengulang kembali dari Checkpoint 1
+            task.wait(cpDelay)
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- // ================= UI CONTROLS (WindUI) ================= //
+
+-- [TAB MAIN FEATURE]
+TabMain:Toggle({
+    Title = "Auto Fish (Perfect + Spam Tap)",
+    Desc = "Otomatis lempar sempurna (99) dan isi bar minigame",
+    Icon = "fish",
+    Value = false,
+    Callback = function(state) 
+        autoFishEnabled = state
+        WindUI:Notify({
+            Title = "Auto Fish",
+            Content = state and "Diaktifkan!" or "Dimatikan!",
+            Duration = 2,
+        })
+    end
+})
+
+TabMain:Toggle({
+    Title = "Auto Claim Inventory (Ambil Semua)",
+    Desc = "Otomatis mengambil hasil tangkapan ikan secara berkala",
+    Icon = "package",
+    Value = false,
+    Callback = function(state) 
+        autoClaimEnabled = state
+        WindUI:Notify({
+            Title = "Auto Claim",
+            Content = state and "Auto Ambil Semua Aktif!" or "Auto Ambil Semua Mati!",
+            Duration = 2,
+        })
+    end
+})
+
+TabMain:Input({
+    Title = "Durasi Tarik / Tap Bar (Detik)",
+    Desc = "Berapa lama spam tap bar berjalan saat menarik ikan",
+    Value = tostring(reelingDuration),
+    Placeholder = "Contoh: 1.8...",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num and num > 0 then
+            reelingDuration = num
+            WindUI:Notify({
+                Title = "Durasi Tarik Diubah",
+                Content = "Set ke: " .. tostring(num) .. "s",
+                Duration = 2,
+            })
+        end
+    end
+})
+
+TabMain:Input({
+    Title = "Delay Lempar (Cast Delay)",
+    Desc = "Jeda dari lempar pancing sampai minigame aktif.",
+    Value = tostring(castDelay),
+    Placeholder = "Contoh: 0.3...",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num and num >= 0 then
+            castDelay = num
+            WindUI:Notify({
+                Title = "Delay Lempar Diubah",
+                Content = "Set ke: " .. tostring(num) .. "s",
+                Duration = 2,
+            })
+        end
+    end
+})
+
+TabMain:Input({
+    Title = "Delay Ulang (Loop Delay)",
+    Desc = "Jeda waktu antar sesi memancing.",
+    Value = tostring(loopDelay),
+    Placeholder = "Contoh: 0.4...",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num and num >= 0 then
+            loopDelay = num
+            WindUI:Notify({
+                Title = "Delay Loop Diubah",
+                Content = "Set ke: " .. tostring(num) .. "s",
+                Duration = 2,
+            })
+        end
+    end
+})
+
+
+-- [TAB SHOP & SELL]
+TabSell:Toggle({
+    Title = "Auto Sell (Jual Semua Ikan)",
+    Desc = "Otomatis menjual seluruh ikan berdasarkan timer",
+    Icon = "dollar-sign",
+    Value = false,
+    Callback = function(state) 
+        autoSellEnabled = state
+        WindUI:Notify({
+            Title = "Auto Sell",
+            Content = state and "Auto Jual Semua Aktif!" or "Auto Jual Semua Mati!",
+            Duration = 2,
+        })
+    end
+})
+
+TabSell:Button({
+    Title = "Jual Semua Sekarang",
+    Desc = "Klik untuk langsung menjual semua ikan di inventory",
+    Callback = function()
+        local result = executeSell()
+        if result then
+            WindUI:Notify({
+                Title = "Berhasil",
+                Content = "Semua ikan berhasil dijual!",
+                Duration = 2,
+            })
+        else
+            WindUI:Notify({
+                Title = "Gagal",
+                Content = "Remote JualSemua / InfoJual tidak ditemukan!",
+                Duration = 2,
+            })
+        end
+    end
+})
+
+TabSell:Input({
+    Title = "Timer Auto Sell (Detik)",
+    Desc = "Interval waktu otomatis menjual ikan (Default: 60 detik)",
+    Value = tostring(sellInterval),
+    Placeholder = "Contoh: 60...",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num and num > 0 then
+            sellInterval = num
+            WindUI:Notify({
+                Title = "Timer Sell Diubah",
+                Content = "Set ke: " .. tostring(num) .. " detik",
+                Duration = 2,
+            })
+        end
+    end
+})
+
+
+-- [TAB TELEPORT CHECKPOINT & SUMMIT]
+
+-- Toggle Utama Auto Checkpoint Loop
+TabTeleport:Toggle({
+    Title = "Auto Teleport Checkpoint (1-20 & Summit)",
+    Desc = "Otomatis teleport berurutan dari CP 1 sampai 20, ke Summit, lalu ke area ekstra",
+    Icon = "repeat",
+    Value = false,
+    Callback = function(state)
+        autoCheckpointEnabled = state
+        WindUI:Notify({
+            Title = "Auto Checkpoint",
+            Content = state and "Diaktifkan (Loop Berjalan)!" | "Dimatikan!",
+            Duration = 2,
+        })
+    end
+})
+
+-- Input Pengaturan Delay Antar Checkpoint
+TabTeleport:Input({
+    Title = "Delay Antar Checkpoint (Detik)",
+    Desc = "Jeda waktu perpindahan dari satu checkpoint ke checkpoint berikutnya",
+    Value = tostring(cpDelay),
+    Placeholder = "Contoh: 0.5...",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num and num >= 0 then
+            cpDelay = num
+            WindUI:Notify({
+                Title = "Delay Checkpoint Diubah",
+                Content = "Set ke: " .. tostring(num) .. "s",
+                Duration = 2,
+            })
+        end
+    end
+})
+
+-- Input Pengaturan Delay Setelah Summit
+TabTeleport:Input({
+    Title = "Delay di Summit (Detik)",
+    Desc = "Berapa lama menunggu di Summit sebelum lanjut ke koordinat berikutnya",
+    Value = tostring(summitWaitTime),
+    Placeholder = "Contoh: 5...",
+    Callback = function(text)
+        local num = tonumber(text)
+        if num and num >= 0 then
+            summitWaitTime = num
+            WindUI:Notify({
+                Title = "Delay Summit Diubah",
+                Content = "Set ke: " .. tostring(num) .. "s",
+                Duration = 2,
+            })
+        end
+    end
+})
+
+-- Tombol Teleport Manual per Checkpoint (1 - 20)
+for i = 1, 20 do
+    TabTeleport:Button({
+        Title = "Teleport ke Checkpoint " .. i,
+        Desc = "Teleport manual ke Checkpoint " .. i,
+        Callback = function()
+            local key = "Checkpoint " .. i
+            if CheckpointCoords[key] then
+                teleportToPosition(CheckpointCoords[key])
+                WindUI:Notify({
+                    Title = "Teleport Berhasil",
+                    Content = "Berpindah ke Checkpoint " .. i,
+                    Duration = 2,
+                })
+            end
+        end
+    })
+end
+
+-- Tombol Teleport Manual ke Summit
+TabTeleport:Button({
+    Title = "Teleport ke Summit",
+    Desc = "Teleport manual ke area Summit",
+    Callback = function()
+        if CheckpointCoords["Summit"] then
+            teleportToPosition(CheckpointCoords["Summit"])
+            WindUI:Notify({
+                Title = "Teleport Berhasil",
+                Content = "Berpindah ke Summit!",
+                Duration = 2,
+            })
+        end
+    end
+})
+
+-- Tombol Teleport Manual ke Koordinat Ekstra Setelah Summit
+TabTeleport:Button({
+    Title = "Teleport ke Summit Extra (Koordinat Tujuan Akhir)",
+    Desc = "Teleport manual ke koordinat setelah Summit",
+    Callback = function()
+        if CheckpointCoords["SummitExtra"] then
+            teleportToPosition(CheckpointCoords["SummitExtra"])
+            WindUI:Notify({
+                Title = "Teleport Berhasil",
+                Content = "Berpindah ke Koordinat Ekstra Summit!",
+                Duration = 2,
+            })
+        end
+    end
+})
