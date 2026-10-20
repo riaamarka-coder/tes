@@ -129,7 +129,7 @@ end
 local function EquipPickaxe()
     local hrp, character = GetRootPart()
     if not character then return end
-     
+    
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if humanoid and not character:FindFirstChildOfClass("Tool") then
         local backpack = LocalPlayer:FindFirstChild("Backpack")
@@ -198,6 +198,7 @@ task.spawn(function()
                 continue
             end
 
+            -- FASE 1: Ambil Egg baru dari Map (Star -> TP Egg -> Swing -> Prompt -> TP Base -> Reset)
             local availableEggs = GetAvailableEggs()
              
             -- Filter target eggs
@@ -219,10 +220,7 @@ task.spawn(function()
                 local targetPart = chosenEgg:FindFirstChild("p1") or chosenEgg:FindFirstChildWhichIsA("BasePart") or chosenEgg
 
                 if targetPart then
-                    ------------------------------------------------------------
-                    -- STEP 1: TP ke workspace.Build.Parts:GetChildren()[9] (START)
-                    ------------------------------------------------------------
-                    if not AutoFarmEnabled then break end
+                    -- 1. TP ke part workspace.Build.Parts:GetChildren()[9] (Start)
                     local baseParts = Workspace:FindFirstChild("Build") and Workspace.Build:FindFirstChild("Parts")
                     if baseParts then
                         local targetBasePart = baseParts:GetChildren()[9]
@@ -232,10 +230,9 @@ task.spawn(function()
                     end
                     task.wait(0.5)
 
-                    ------------------------------------------------------------
-                    -- STEP 2: Equip Pickaxe & TP ke Target Egg
-                    ------------------------------------------------------------
                     if not AutoFarmEnabled then break end
+
+                    -- 2. Equip Pickaxe & TP ke Target Egg
                     EquipPickaxe()
                     task.wait(0.2)
 
@@ -246,10 +243,9 @@ task.spawn(function()
                     end
                     task.wait(0.4)
 
-                    ------------------------------------------------------------
-                    -- STEP 3: Auto Swing & Tunggu Prompt (Steal Egg)
-                    ------------------------------------------------------------
                     if not AutoFarmEnabled then break end
+
+                    -- 3. Auto Swing & Tunggu Prompt (Steal Egg)
                     if PickaxeController and PickaxeController.Swing then
                         pcall(function() PickaxeController.Swing(chosenEgg) end)
                     elseif AutoSwingController and AutoSwingController.SetOn then
@@ -271,15 +267,12 @@ task.spawn(function()
                                 break
                             end
                         end
-                    until promptFound or (tick() - startTime > 12) or not AutoFarmEnabled
+                    until promptFound or (tick() - startTime > 12)
 
-                    if not AutoFarmEnabled then break end
                     task.wait(0.8)
-
-                    ------------------------------------------------------------
-                    -- STEP 4: Teleport Kembali ke Base Player
-                    ------------------------------------------------------------
                     if not AutoFarmEnabled then break end
+
+                    -- 4. Teleport Kembali ke Base Player
                     local playerBaseHitbox = OwnBase.Hitbox()
                     if playerBaseHitbox then
                         TeleportTo(playerBaseHitbox.CFrame + Vector3.new(0, 4, 0))
@@ -289,12 +282,11 @@ task.spawn(function()
                             TeleportTo(fallbackParts:GetChildren()[9].CFrame + Vector3.new(0, 3, 0))
                         end
                     end
-                    task.wait(0.8)
+                    task.wait(1.0) -- Jeda sebentar di base sebelum reset agar egg terjatuh otomatis
 
-                    ------------------------------------------------------------
-                    -- STEP 5: Respon Ulang (Mati agar Egg Jatuh di Base)
-                    ------------------------------------------------------------
                     if not AutoFarmEnabled then break end
+
+                    -- 5. Reset / Respawn Karakter (Egg otomatis jatuh di base)
                     local currentChar = LocalPlayer.Character
                     if currentChar then
                         local hum = currentChar:FindFirstChildOfClass("Humanoid")
@@ -305,45 +297,43 @@ task.spawn(function()
 
                     -- Tunggu karakter respawn selesai penuh
                     LocalPlayer.CharacterAdded:Wait()
-                    local newRoot = LocalPlayer.Character:WaitForChild("HumanoidRootPart", 10)
-                    
-                    -- Tunggu sebentar setelah respawn di base agar egg stabil di base
-                    task.wait(1.5)
+                    local newRoot, newChar = GetRootPart()
+                    task.wait(1.5) -- Jeda santai setelah respawn
+
                     if not AutoFarmEnabled then break end
 
-                    ------------------------------------------------------------
-                    -- STEP 6: Promot Lagi (Ambil Egg yang tadi jatuh di Base)
-                    ------------------------------------------------------------
+                    -- FASE 2: Setelah Respawn, TP ke Base (jika belum di base) lalu Prompt Egg yang jatuh tadi
+                    local baseHitbox = OwnBase.Hitbox()
+                    if baseHitbox and newRoot then
+                        TeleportTo(baseHitbox.CFrame + Vector3.new(0, 3, 0))
+                        task.wait(0.5)
+                    end
+
+                    -- Cari ProximityPrompt dari Egg yang baru saja dijatuhkan di base
                     local pickupPromptFound = false
                     local pickupStartTime = tick()
 
                     repeat
                         task.wait(0.2)
                         if not AutoFarmEnabled then break end
-                        local promptAnchor = Workspace:FindFirstChild("PromptAnchor")
-                        if promptAnchor then
-                            local prompt = promptAnchor:FindFirstChildWhichIsA("ProximityPrompt") or promptAnchor:FindFirstChild("StealPrompt")
-                            if prompt then
-                                pickupPromptFound = true
-                                fireproximityprompt(prompt)
-                                break
-                            end
-                        end
-
-                        -- Fallback cari prompt langsung dari workspace / egg model
+                        
+                        -- Cari prompt terdekat di sekitar base / karakter
                         for _, desc in ipairs(Workspace:GetDescendants()) do
                             if desc:IsA("ProximityPrompt") and desc.Enabled then
                                 local parentPart = desc.Parent
-                                if parentPart and newRoot and (parentPart.Position - newRoot.Position).Magnitude < 15 then
-                                    pickupPromptFound = true
-                                    fireproximityprompt(desc)
-                                    break
+                                if parentPart then
+                                    local pos = parentPart:IsA("BasePart") and parentPart.Position or (parentPart:IsA("Model") and parentPart.PrimaryPart and parentPart.PrimaryPart.Position)
+                                    if pos and (pos - newRoot.Position).Magnitude < 20 then
+                                        pickupPromptFound = true
+                                        fireproximityprompt(desc)
+                                        break
+                                    end
                                 end
                             end
                         end
-                    until pickupPromptFound or (tick() - pickupStartTime > 6) or not AutoFarmEnabled
+                    until pickupPromptFound or (tick() - pickupStartTime > 5)
 
-                    -- Jeda santai sebelum mengulang loop dari awal (start)
+                    -- Jeda santai setelah prompt egg di base sebelum kembali mengulang dari Start
                     task.wait(1.5)
                 end
             end
@@ -360,7 +350,7 @@ local Window = WindUI:CreateWindow({
     Author = "by Script",
 })
 
-MainTab = Window:Tab({
+local MainTab = Window:Tab({
     Title = "Main Farm",
     Icon = "bird",
     Locked = false,
@@ -368,22 +358,14 @@ MainTab = Window:Tab({
 
 MainTab:Toggle({
     Title = "Auto Steal & Return",
-    Desc = "TP Start -> TP Egg -> Steal -> TP Base -> Respon Ulang -> Ambil Egg -> Ulangi dari Start",
+    Desc = "TP Start -> TP Egg -> Steal -> TP Base -> Reset -> Prompt Egg di Base -> Ulang dari Start",
     Icon = "play",
     Type = "Checkbox",
     Value = false,
     Callback = function(state)
         AutoFarmEnabled = state
-        if not state then
-            -- Jika toggle dimatikan, matikan juga autoswing
-            if AutoSwingController and AutoSwingController.SetOn then
-                pcall(function() AutoSwingController.SetOn(false) end)
-            end
-        else
-            -- Jika di-on-kan kembali, alur otomatis dimulai dari Start (karena loop membaca ulang kondisi)
-            if AutoSwingController and AutoSwingController.SetOn then
-                pcall(function() AutoSwingController.SetOn(true) end)
-            end
+        if AutoSwingController and AutoSwingController.SetOn then
+            pcall(function() AutoSwingController.SetOn(state) end)
         end
     end
 })
