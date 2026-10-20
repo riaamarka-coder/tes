@@ -53,7 +53,7 @@ WindUI:AddTheme({
 -- 2. CreateWindow (Sudah diganti Theme = "Black Green")
 local Window = WindUI:CreateWindow({
     Title = "Kriuk Hub",
-    Icon = "door-open",
+    Icon = "rbxassetid://109014206871239",
     Author = "by .wisz",
     Folder = "MyKriukHub",
     
