@@ -1,4 +1,3 @@
-
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
 -- 1. Buat Tema "Black Green"
@@ -151,14 +150,12 @@ local function getEquippedRod()
     local character = LocalPlayer.Character
     if not character then return nil end
 
-    -- 1. Cari pancingan yang sedang dipegang di karakter
     for _, tool in ipairs(character:GetChildren()) do
         if tool:IsA("Tool") and tool:FindFirstChild("Mechanics") and tool.Mechanics:FindFirstChild("Remotes") then
             return tool
         end
     end
 
-    -- 2. Jika di Backpack, auto-equip ke karakter dengan aman
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
         if tool:IsA("Tool") and tool:FindFirstChild("Mechanics") and tool.Mechanics:FindFirstChild("Remotes") then
@@ -192,19 +189,17 @@ local function doAutoFish()
     local miniGameRemote = remotes:FindFirstChild("MiniGame")
     if not castEvent or not miniGameRemote then return end
 
-    -- Step 1: Lempar Pancingan dengan Parameter 99 (Perfect Cast)
     pcall(function()
         castEvent:FireServer(true)
         task.wait(0.05)
         if not autoFishEnabled then return end
         castEvent:FireServer(
             false,
-            99, -- Nilai 99 untuk lemparan sempurna (Perfect)
+            99,
             Vector3.new(0.13821893930435181, 0, 0.99040168523788452)
         )
     end)
 
-    -- Step 2: Efek Visual Tanda Seru Bersama (Opsional, dilindungi pcall)
     pcall(function()
         local tandaSeru = ReplicatedStorage:FindFirstChild("TandaSeruBersama")
         if tandaSeru then
@@ -220,7 +215,6 @@ local function doAutoFish()
         end
     end)
 
-    -- Step 3: Jeda hingga ikan menyangkut / bar minigame muncul
     local elapsedWait = 0
     while elapsedWait < castDelay do
         if not autoFishEnabled then return end
@@ -228,19 +222,15 @@ local function doAutoFish()
         elapsedWait = elapsedWait + 0.05
     end
 
-    -- Step 4: Real-time Continuous Tap/Spam Bar MiniGame
     local startTime = tick()
     while tick() - startTime < reelingDuration do
         if not autoFishEnabled then break end
-        
         pcall(function()
             miniGameRemote:FireServer(true)
         end)
-        
         task.wait(0.02)
     end
     
-    -- Final trigger untuk memastikan sukses
     pcall(function()
         if autoFishEnabled then
             miniGameRemote:FireServer(true)
@@ -248,31 +238,51 @@ local function doAutoFish()
     end)
 end
 
--- // Fungsi Menjual Semua Ikan (Menggunakan InfoJual & JualSemua)
+-- // Fungsi Diperbarui: Menjual Semua Ikan (Pencarian Remote Aman & Fleksibel)
 local function executeSell()
     local success = pcall(function()
+        local executed = false
+
+        -- Cek jalur 1: Melalui folder ReplicatedStorage.Remote.Mancing
         local mancingRemote = ReplicatedStorage:FindFirstChild("Remote") 
             and ReplicatedStorage.Remote:FindFirstChild("Mancing")
         
-        if not mancingRemote then return false end
+        if mancingRemote then
+            local infoJual = mancingRemote:FindFirstChild("InfoJual")
+            local jualSemua = mancingRemote:FindFirstChild("JualSemua")
+            
+            if infoJual then
+                pcall(function()
+                    infoJual:InvokeServer("semua")
+                    executed = true
+                end)
+            end
 
-        local infoJual = mancingRemote:FindFirstChild("InfoJual")
-        local jualSemua = mancingRemote:FindFirstChild("JualSemua")
-        
-        local executed = false
-
-        if infoJual then
-            pcall(function()
-                infoJual:InvokeServer("semua")
-                executed = true
-            end)
+            if jualSemua then
+                pcall(function()
+                    jualSemua:InvokeServer()
+                    executed = true
+                end)
+            end
         end
 
-        if jualSemua then
-            pcall(function()
-                jualSemua:InvokeServer()
-                executed = true
-            end)
+        -- Cek jalur 2: Jika direktori berada langsung di ReplicatedStorage atau turunan lainnya
+        if not executed then
+            local altInfo = ReplicatedStorage:FindFirstChild("InfoJual", true)
+            if altInfo then
+                pcall(function()
+                    altInfo:InvokeServer("semua")
+                    executed = true
+                end)
+            end
+
+            local altJual = ReplicatedStorage:FindFirstChild("JualSemua", true)
+            if altJual then
+                pcall(function()
+                    altJual:InvokeServer()
+                    executed = true
+                end)
+            end
         end
 
         return executed
@@ -325,7 +335,6 @@ end)
 task.spawn(function()
     while true do
         if autoCheckpointEnabled then
-            -- 1. Teleport dari Checkpoint 1 sampai 20 secara berurutan
             for i = 1, 20 do
                 if not autoCheckpointEnabled then break end
                 local key = "Checkpoint " .. i
@@ -335,26 +344,21 @@ task.spawn(function()
                 task.wait(cpDelay)
             end
 
-            -- 2. Teleport ke Summit
             if autoCheckpointEnabled and CheckpointCoords["Summit"] then
                 teleportToPosition(CheckpointCoords["Summit"])
             end
             task.wait(cpDelay)
 
-            -- 3. Teleport ke Koordinat Ekstra setelah Summit
             if autoCheckpointEnabled and CheckpointCoords["SummitExtra"] then
                 teleportToPosition(CheckpointCoords["SummitExtra"])
             end
 
-            -- 4. Delay berjalan di koordinat ekstra setelah summit (sesuai settingan summitWaitTime)
             local elapsedSummitWait = 0
             while elapsedSummitWait < summitWaitTime do
                 if not autoCheckpointEnabled then break end
                 task.wait(0.1)
                 elapsedSummitWait = elapsedSummitWait + 0.1
             end
-
-            -- Setelah delay selesai, loop akan kembali mengulang dari Checkpoint 1
         else
             task.wait(0.5)
         end
