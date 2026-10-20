@@ -1,0 +1,448 @@
+-- Load WindUI Library
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+-- Services
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+-- State Controls
+local AutoFarmEnabled = false
+local SelectedZone = "All / Random"
+
+-- Load Internal Game Modules for Auto Swing
+local PickaxeConfig = require(ReplicatedStorage.Shared.PickaxeConfig)
+
+local PickaxeController, AutoSwingController
+
+pcallfunction = pcall(function()
+    local clientFolder = LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("Client")
+    local controllers = clientFolder:WaitForChild("Controllers")
+     
+    PickaxeController = require(controllers:WaitForChild("PickaxeController"))
+    AutoSwingController = require(controllers:WaitForChild("AutoSwingController"))
+end)
+
+--------------------------------------------------------------------------------
+-- BASE DETECTION SYSTEM
+--------------------------------------------------------------------------------
+local OwnBase = {}
+local v_u_7 = nil
+local v_u_8 = {}
+local v_u_9 = {}
+
+local function v_u_14(p_u_10)
+    if p_u_10:GetAttribute("OwnerUserId") == LocalPlayer.UserId then
+        v_u_7 = p_u_10
+        for _, v11 in table.clone(v_u_8) do
+            if v11.Last ~= p_u_10 then
+                v11.Last = p_u_10
+                task.spawn(v11.Callback, p_u_10)
+            end
+        end
+    end
+    if not v_u_9[p_u_10] then
+        v_u_9[p_u_10] = p_u_10:GetAttributeChangedSignal("OwnerUserId"):Connect(function()
+            if p_u_10:GetAttribute("OwnerUserId") == LocalPlayer.UserId then
+                local v12 = p_u_10
+                v_u_7 = v12
+                for _, v13 in table.clone(v_u_8) do
+                    if v13.Last ~= v12 then
+                        v13.Last = v12
+                        task.spawn(v13.Callback, v12)
+                    end
+                end
+            elseif v_u_7 == p_u_10 then
+                v_u_7 = nil
+            end
+        end)
+    end
+end
+
+local function v_u_17(p15)
+    local v16 = v_u_9[p15]
+    if v16 then
+        v16:Disconnect()
+        v_u_9[p15] = nil
+    end
+    if v_u_7 == p15 then
+        v_u_7 = nil
+    end
+end
+
+local function v_u_20(p18)
+    for _, v19 in p18:GetChildren() do
+        v_u_14(v19)
+    end
+    p18.ChildAdded:Connect(v_u_14)
+    p18.ChildRemoved:Connect(v_u_17)
+end
+
+local PlotsFolder = Workspace:FindFirstChild("Plots")
+if PlotsFolder then
+    v_u_20(PlotsFolder)
+else
+    local v_u_22 = nil
+    v_u_22 = Workspace.ChildAdded:Connect(function(p23)
+        if p23.Name == "Plots" then
+            if v_u_22 then
+                v_u_22:Disconnect()
+            end
+            v_u_20(p23)
+        end
+    end)
+end
+
+function OwnBase.Get()
+    if v_u_7 and v_u_7.Parent then
+        return v_u_7
+    else
+        return nil
+    end
+end
+
+function OwnBase.Hitbox()
+    local baseModel = OwnBase.Get()
+    if baseModel then
+        local hitbox = baseModel:FindFirstChild("Hitbox") or baseModel:FindFirstChildWhichIsA("BasePart")
+        if hitbox and hitbox:IsA("BasePart") then
+            return hitbox
+        end
+    end
+    return nil
+end
+
+--------------------------------------------------------------------------------
+-- HELPER FUNCTIONS
+--------------------------------------------------------------------------------
+
+-- Helper: Memastikan Karakter & HumanoidRootPart Siap
+local function GetRootPart()
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart", 5)
+    return hrp, character
+end
+
+-- Helper Function: Equip Pickaxe / Tool
+local function EquipPickaxe()
+    local hrp, character = GetRootPart()
+    if not character then return end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid and not character:FindFirstChildOfClass("Tool") then
+        local backpack = LocalPlayer:FindFirstChild("Backpack")
+        if backpack then
+            local toolName = PickaxeConfig and PickaxeConfig.ToolName or "Pickaxe"
+            local tool = backpack:FindFirstChild(toolName) or backpack:FindFirstChildWhichIsA("Tool")
+            if tool then
+                humanoid:EquipTool(tool)
+            end
+        end
+    end
+end
+
+-- Helper Function: Teleport Aman
+local function TeleportTo(cframe)
+    local hrp = GetRootPart()
+    if hrp then
+        hrp.CFrame = cframe
+    end
+end
+
+-- Helper Function: Fetch Eggs Dynamically
+local function GetAvailableEggs()
+    local eggList = {}
+    local zoneBuilds = Workspace:FindFirstChild("Build") and Workspace.Build:FindFirstChild("ZoneBuilds")
+     
+    if zoneBuilds then
+        for _, zone in pairs(zoneBuilds:GetChildren()) do
+            local eggsFolder = zone:FindFirstChild("Eggs")
+            if eggsFolder then
+                for idx, egg in pairs(eggsFolder:GetChildren()) do
+                    table.insert(eggList, {
+                        Name = zone.Name .. " - Egg " .. tostring(idx),
+                        Instance = egg,
+                        Zone = zone.Name
+                    })
+                end
+            end
+        end
+    end
+    return eggList
+end
+
+-- Collect Zone Names
+local function GetZoneNames()
+    local zones = { "All / Random" }
+    local zoneBuilds = Workspace:FindFirstChild("Build") and Workspace.Build:FindFirstChild("ZoneBuilds")
+    if zoneBuilds then
+        for _, zone in pairs(zoneBuilds:GetChildren()) do
+            table.insert(zones, zone.Name)
+        end
+    end
+    return zones
+end
+
+-- Safe Remote Trigger for Drop
+local function TriggerDropCarried()
+    local dropRemote = ReplicatedStorage:FindFirstChild("DropCarriedRemote")
+    if dropRemote then
+        if dropRemote:IsA("RemoteEvent") then
+            dropRemote:FireServer()
+        elseif dropRemote:IsA("RemoteFunction") then
+            pcall(function() dropRemote:InvokeServer() end)
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+-- MAIN FARMING LOOP
+--------------------------------------------------------------------------------
+task.spawn(function()
+    while task.wait(0.5) do
+        if AutoFarmEnabled then
+            -- Pastikan Karakter sudah spawned dan ter-load sempurna
+            local hrp, character = GetRootPart()
+            if not hrp or not character then
+                task.wait(1)
+                continue
+            end
+
+            local availableEggs = GetAvailableEggs()
+             
+            -- Filter target eggs
+            local targetPool = {}
+            if SelectedZone == "All / Random" then
+                for _, eggData in ipairs(availableEggs) do
+                    table.insert(targetPool, eggData.Instance)
+                end
+            else
+                for _, eggData in ipairs(availableEggs) do
+                    if eggData.Zone == SelectedZone then
+                        table.insert(targetPool, eggData.Instance)
+                    end
+                end
+            end
+
+            if #targetPool > 0 then
+                local chosenEgg = targetPool[math.random(1, #targetPool)]
+                local targetPart = chosenEgg:FindFirstChild("p1") or chosenEgg:FindFirstChildWhichIsA("BasePart") or chosenEgg
+
+                if targetPart then
+                    ------------------------------------------------------------
+                    -- STEP 1: TP ke workspace.Build.Parts:GetChildren()[9]
+                    ------------------------------------------------------------
+                    local baseParts = Workspace:FindFirstChild("Build") and Workspace.Build:FindFirstChild("Parts")
+                    if baseParts then
+                        local targetBasePart = baseParts:GetChildren()[9]
+                        if targetBasePart and targetBasePart:IsA("BasePart") then
+                            TeleportTo(targetBasePart.CFrame + Vector3.new(0, 3, 0))
+                        end
+                    end
+                    task.wait(0.5)
+
+                    ------------------------------------------------------------
+                    -- STEP 2: Equip Pickaxe & TP ke Target Egg
+                    ------------------------------------------------------------
+                    EquipPickaxe()
+                    task.wait(0.2)
+
+                    if targetPart:IsA("BasePart") then
+                        TeleportTo(targetPart.CFrame + Vector3.new(0, 3, 0))
+                    elseif targetPart:IsA("Model") and targetPart.PrimaryPart then
+                        TeleportTo(targetPart.PrimaryPart.CFrame + Vector3.new(0, 3, 0))
+                    end
+                    task.wait(0.4)
+
+                    ------------------------------------------------------------
+                    -- STEP 3: Auto Swing & Tunggu Prompt (Steal Egg)
+                    ------------------------------------------------------------
+                    if PickaxeController and PickaxeController.Swing then
+                        pcall(function() PickaxeController.Swing(chosenEgg) end)
+                    elseif AutoSwingController and AutoSwingController.SetOn then
+                        pcall(function() AutoSwingController.SetOn(true) end)
+                    end
+
+                    local promptFound = false
+                    local startTime = tick()
+                     
+                    repeat
+                        task.wait(0.2)
+                        local promptAnchor = Workspace:FindFirstChild("PromptAnchor")
+                        if promptAnchor then
+                            local prompt = promptAnchor:FindFirstChild("StealPrompt")
+                            if prompt and prompt:IsA("ProximityPrompt") then
+                                promptFound = true
+                                fireproximityprompt(prompt)
+                                break
+                            end
+                        end
+                    until promptFound or (tick() - startTime > 12)
+
+                    task.wait(0.6)
+
+                    ------------------------------------------------------------
+                    -- STEP 3.5: TP ke Tembus Tembok / Koordinat Target Baru
+                    -- Menggunakan referensi workspace.Build.ZoneBuilds.Zone3.Parts:GetChildren()[4]
+                    -- Atau fallback ke Vector3.new(-378.57, 0.50, -110.97)
+                    ------------------------------------------------------------
+                    local targetCFrame = CFrame.new(-378.57, 0.50, -110.97)
+                    pcall(function()
+                        local zone3Parts = Workspace.Build.ZoneBuilds.Zone3.Parts
+                        if zone3Parts and zone3Parts:GetChildren()[4] then
+                            local partRef = zone3Parts:GetChildren()[4]
+                            if partRef:IsA("BasePart") then
+                                targetCFrame = partRef.CFrame + Vector3.new(0, 2, 0)
+                            end
+                        end
+                    end)
+                    
+                    TeleportTo(targetCFrame)
+                    task.wait(0.6)
+
+                    -- Ambil/Prompt ulang egg tersebut di koordinat baru
+                    local rePromptFound = false
+                    local rePromptStart = tick()
+                    repeat
+                        task.wait(0.2)
+                        local promptAnchor = Workspace:FindFirstChild("PromptAnchor")
+                        if promptAnchor then
+                            local prompt = promptAnchor:FindFirstChild("StealPrompt") or promptAnchor:FindFirstChildWhichIsA("ProximityPrompt")
+                            if prompt then
+                                rePromptFound = true
+                                fireproximityprompt(prompt)
+                                break
+                            end
+                        end
+                        -- Cari prompt terdekat di sekitar karakter
+                        for _, desc in ipairs(Workspace:GetDescendants()) do
+                            if desc:IsA("ProximityPrompt") and desc.Enabled then
+                                local parentPart = desc.Parent
+                                if parentPart and parentPart:IsA("BasePart") and (parentPart.Position - hrp.Position).Magnitude < 15 then
+                                    rePromptFound = true
+                                    fireproximityprompt(desc)
+                                    break
+                                end
+                            end
+                        end
+                    until rePromptFound or (tick() - rePromptStart > 6)
+
+                    task.wait(0.8)
+
+                    ------------------------------------------------------------
+                    -- STEP 4: Teleport Kembali ke Base Player
+                    ------------------------------------------------------------
+                    local playerBaseHitbox = OwnBase.Hitbox()
+                    if playerBaseHitbox then
+                        TeleportTo(playerBaseHitbox.CFrame + Vector3.new(0, 4, 0))
+                    else
+                        local fallbackParts = Workspace:FindFirstChild("Build") and Workspace.Build:FindFirstChild("Parts")
+                        if fallbackParts and fallbackParts:GetChildren()[9] then
+                            TeleportTo(fallbackParts:GetChildren()[9].CFrame + Vector3.new(0, 3, 0))
+                        end
+                    end
+                    task.wait(0.8)
+
+                    ------------------------------------------------------------
+                    -- STEP 5: Drop Egg di Base & Ambil Kembali via Prompt
+                    ------------------------------------------------------------
+                    TriggerDropCarried()
+                    task.wait(1.2) -- Jeda santai agar egg ter-drop sempurna di base
+
+                    local pickupPromptFound = false
+                    local pickupStartTime = tick()
+
+                    repeat
+                        task.wait(0.2)
+                        local promptAnchor = Workspace:FindFirstChild("PromptAnchor")
+                        if promptAnchor then
+                            local prompt = promptAnchor:FindFirstChildWhichIsA("ProximityPrompt") or promptAnchor:FindFirstChild("StealPrompt")
+                            if prompt then
+                                pickupPromptFound = true
+                                fireproximityprompt(prompt)
+                                break
+                            end
+                        end
+
+                        for _, desc in ipairs(Workspace:GetDescendants()) do
+                            if desc:IsA("ProximityPrompt") and desc.Enabled then
+                                local parentPart = desc.Parent
+                                if parentPart and (parentPart.Position - hrp.Position).Magnitude < 15 then
+                                    pickupPromptFound = true
+                                    fireproximityprompt(desc)
+                                    break
+                                end
+                            end
+                        end
+                    until pickupPromptFound or (tick() - pickupStartTime > 6)
+
+                    task.wait(1.0) -- Jeda santai setelah ambil egg di base
+
+                    ------------------------------------------------------------
+                    -- STEP 6: Reset / Respawn Karakter Santai
+                    ------------------------------------------------------------
+                    local currentChar = LocalPlayer.Character
+                    if currentChar then
+                        local hum = currentChar:FindFirstChildOfClass("Humanoid")
+                        if hum then
+                            hum.Health = 0
+                        end
+                    end
+
+                    -- Tunggu karakter respawn selesai penuh
+                    LocalPlayer.CharacterAdded:Wait()
+                    local newRoot = LocalPlayer.Character:WaitForChild("HumanoidRootPart", 10)
+                    
+                    -- Delay aman 2.5 detik agar status character stabil sebelum mengulang loop
+                    task.wait(2.5)
+                end
+            end
+        end
+    end
+end)
+
+--------------------------------------------------------------------------------
+-- UI SETUP (WindUI)
+--------------------------------------------------------------------------------
+local Window = WindUI:CreateWindow({
+    Title = "Auto Steal Hub",
+    Icon = "door-open",
+    Author = "by Script",
+})
+
+local MainTab = Window:Tab({
+    Title = "Main Farm",
+    Icon = "bird",
+    Locked = false,
+})
+
+MainTab:Toggle({
+    Title = "Auto Steal & Return",
+    Desc = "TP Start -> TP Egg -> TP Zone3 -> TP Base -> Drop & Pick -> Reset",
+    Icon = "play",
+    Type = "Checkbox",
+    Value = false,
+    Callback = function(state)
+        AutoFarmEnabled = state
+        if AutoSwingController and AutoSwingController.SetOn then
+            pcall(function() AutoSwingController.SetOn(state) end)
+        end
+    end
+})
+
+MainTab:Dropdown({
+    Title = "Pilih Zona Egg",
+    Desc = "Pilih area spesifik atau acak dari semua zona",
+    Values = GetZoneNames(),
+    Value = { "All / Random" },
+    Multi = false,
+    AllowNone = false,
+    Callback = function(option)
+        if type(option) == "table" then
+            SelectedZone = option[1] or "All / Random"
+        else
+            SelectedZone = option
+        end
+    end
+})
