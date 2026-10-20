@@ -1,30 +1,103 @@
--- // 1. Load WindUI Library
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
--- // 2. Buat Window Utama
-local Window = WindUI:CreateWindow({
-    Title = "Auto Fish Hub [Master Pro]",
-    Icon = "fish",
-    Author = "Auto Script Pro",
+-- 1. Buat Tema "Black Green"
+WindUI:AddTheme({
+    Name = "Black Green",
+    
+    Accent = Color3.fromHex("#22c55e"),            -- Hijau Neon
+    Background = Color3.fromHex("#050505"),        -- Hitam Pekat
+    BackgroundTransparency = 0,
+    WindowBackground = Color3.fromHex("#0a0a0a"),  -- Hitam UI
+    
+    Outline = Color3.fromHex("#22c55e"),           -- Border Hijau
+    WindowShadow = Color3.fromHex("#000000"),
+    
+    Text = Color3.fromHex("#ffffff"),              -- Teks Putih
+    Placeholder = Color3.fromHex("#737373"),
+    Icon = Color3.fromHex("#22c55e"),              -- Icon Hijau
+    Hover = Color3.fromHex("#ffffff"),
+    
+    WindowTopbarTitle = Color3.fromHex("#ffffff"),
+    WindowTopbarAuthor = Color3.fromHex("#22c55e"),
+    WindowTopbarIcon = Color3.fromHex("#22c55e"),
+    WindowTopbarButtonIcon = Color3.fromHex("#a3a3a3"),
+    
+    TabBackground = Color3.fromHex("#141414"),
+    TabTitle = Color3.fromHex("#ffffff"),          -- Judul Tab Putih
+    TabIcon = Color3.fromHex("#22c55e"),
+    
+    ElementBackground = Color3.fromHex("#171717"), -- Kartu Tombol/Toggle
+    ElementTitle = Color3.fromHex("#ffffff"),      -- Judul Element Putih
+    ElementDesc = Color3.fromHex("#a3a3a3"),
+    ElementIcon = Color3.fromHex("#22c55e"),
+    
+    Button = Color3.fromHex("#222222"),
+    Toggle = Color3.fromHex("#222222"),
+    ToggleBar = Color3.fromHex("#22c55e"),         -- Indikator Toggle Hijau
+    Checkbox = Color3.fromHex("#222222"),
+    CheckboxIcon = Color3.fromHex("#ffffff"),
+    Slider = Color3.fromHex("#222222"),
+    SliderThumb = Color3.fromHex("#22c55e"),
+    
+    DialogBackground = Color3.fromHex("#0a0a0a"),
+    DialogTitle = Color3.fromHex("#ffffff"),
+    DialogContent = Color3.fromHex("#a3a3a3"),
+    DialogIcon = Color3.fromHex("#22c55e"),
+    
+    PopupBackground = Color3.fromHex("#0a0a0a"),
+    PopupTitle = Color3.fromHex("#ffffff"),
+    PopupContent = Color3.fromHex("#a3a3a3"),
+    PopupIcon = Color3.fromHex("#22c55e"),
 })
+
+-- 2. CreateWindow (Sudah diganti Theme = "Black Green")
+local Window = WindUI:CreateWindow({
+    Title = "Kriuk Hub",
+    Icon = "door-open",
+    Author = "by .wisz",
+    Folder = "MyKriukHub",
+    
+    Size = UDim2.fromOffset(580, 460),
+    MinSize = Vector2.new(560, 350),
+    MaxSize = Vector2.new(850, 560),
+    ToggleKey = Enum.KeyCode.LeftShift,
+    Transparent = false,             -- Di-set false agar warna background tidak tembus/terpengaruh transparansi
+    Theme = "Black Green",           -- <--- NAMA TEMA DARI WindUI:AddTheme
+    Resizable = true,
+    SideBarWidth = 200,
+    HideSearchBar = true,
+    ScrollBarEnabled = false,
+    
+    User = {
+        Enabled = true,
+        Anonymous = false,
+        Callback = function()
+            print("clicked")
+        end,
+    },
+})
+
+-- 3. Paksa SetTheme ulang jika menggunakan executor mobile (Arceus/Delta/Fluxus)
+WindUI:SetTheme("Black Green")
+
 
 -- // 3. Buat Tab Utama
 local TabMain = Window:Tab({
-    Title = "Main Feature",
-    Icon = "bird",
+    Title = "Fishing",
+    Icon = "fish",
     Locked = false,
 })
 
 -- // 4. Buat Tab Khusus Sell / Toko
 local TabSell = Window:Tab({
-    Title = "Shop & Sell",
+    Title = "Shop",
     Icon = "dollar-sign",
     Locked = false,
 })
 
 -- // 5. Buat Tab Khusus Teleport Checkpoint
 local TabTeleport = Window:Tab({
-    Title = "Teleport Checkpoint",
+    Title = "Sumit",
     Icon = "map-pin",
     Locked = false,
 })
@@ -310,8 +383,8 @@ end)
 
 -- [TAB MAIN FEATURE]
 TabMain:Toggle({
-    Title = "Auto Fish (Perfect + Spam Tap)",
-    Desc = "Otomatis lempar sempurna (99) dan isi bar minigame",
+    Title = "Instan Fishing",
+    Desc = "Otomatis lempar dan menarik ikan",
     Icon = "fish",
     Value = false,
     Callback = function(state) 
@@ -340,7 +413,7 @@ TabMain:Toggle({
 })
 
 TabMain:Input({
-    Title = "Durasi Tarik / Tap Bar (Detik)",
+    Title = "clicking",
     Desc = "Berapa lama spam tap bar berjalan saat menarik ikan",
     Value = tostring(reelingDuration),
     Placeholder = "Contoh: 1.8...",
@@ -358,7 +431,7 @@ TabMain:Input({
 })
 
 TabMain:Input({
-    Title = "Delay Lempar (Cast Delay)",
+    Title = "clicking",
     Desc = "Jeda dari lempar pancing sampai minigame aktif.",
     Value = tostring(castDelay),
     Placeholder = "Contoh: 0.3...",
@@ -376,7 +449,7 @@ TabMain:Input({
 })
 
 TabMain:Input({
-    Title = "Delay Ulang (Loop Delay)",
+    Title = "throw",
     Desc = "Jeda waktu antar sesi memancing.",
     Value = tostring(loopDelay),
     Placeholder = "Contoh: 0.4...",
