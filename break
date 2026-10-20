@@ -117,12 +117,14 @@ end
 -- HELPER FUNCTIONS
 --------------------------------------------------------------------------------
 
+-- Helper: Memastikan Karakter & HumanoidRootPart Siap
 local function GetRootPart()
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local hrp = character:WaitForChild("HumanoidRootPart", 5)
     return hrp, character
 end
 
+-- Helper Function: Equip Pickaxe / Tool
 local function EquipPickaxe()
     local hrp, character = GetRootPart()
     if not character then return end
@@ -140,6 +142,7 @@ local function EquipPickaxe()
     end
 end
 
+-- Helper Function: Teleport Aman
 local function TeleportTo(cframe)
     local hrp = GetRootPart()
     if hrp then
@@ -147,6 +150,7 @@ local function TeleportTo(cframe)
     end
 end
 
+-- Helper Function: Fetch Eggs Dynamically
 local function GetAvailableEggs()
     local eggList = {}
     local zoneBuilds = Workspace:FindFirstChild("Build") and Workspace.Build:FindFirstChild("ZoneBuilds")
@@ -168,6 +172,7 @@ local function GetAvailableEggs()
     return eggList
 end
 
+-- Collect Zone Names
 local function GetZoneNames()
     local zones = { "All / Random" }
     local zoneBuilds = Workspace:FindFirstChild("Build") and Workspace.Build:FindFirstChild("ZoneBuilds")
@@ -179,6 +184,7 @@ local function GetZoneNames()
     return zones
 end
 
+-- Safe Remote Trigger for Drop
 local function TriggerDropCarried()
     local dropRemote = ReplicatedStorage:FindFirstChild("DropCarriedRemote")
     if dropRemote then
@@ -190,59 +196,13 @@ local function TriggerDropCarried()
     end
 end
 
-local function FireNearestPrompt()
-    local success = false
-    local startTime = tick()
-    repeat
-        task.wait(0.2)
-        local hrp = GetRootPart()
-        if not hrp then break end
-
-        -- Cari dari PromptAnchor
-        local promptAnchor = Workspace:FindFirstChild("PromptAnchor")
-        if promptAnchor then
-            local prompt = promptAnchor:FindFirstChildWhichIsA("ProximityPrompt") or promptAnchor:FindFirstChild("StealPrompt")
-            if prompt and prompt.Enabled then
-                fireproximityprompt(prompt)
-                success = true
-                break
-            end
-        end
-
-        -- Cari dari sekitar karakter
-        for _, desc in ipairs(Workspace:GetDescendants()) do
-            if desc:IsA("ProximityPrompt") and desc.Enabled then
-                local parentPart = desc.Parent
-                if parentPart and parentPart:IsA("BasePart") and (parentPart.Position - hrp.Position).Magnitude < 15 then
-                    fireproximityprompt(desc)
-                    success = true
-                    break
-                end
-            end
-        end
-    until success or (tick() - startTime > 5)
-    return success
-end
-
--- Fungsi Menghilangkan Tembok / Part
-local function RemoveTargetWall()
-    pcall(function()
-        local zone3Parts = Workspace.Build.ZoneBuilds:FindFirstChild("Zone3") and Workspace.Build.ZoneBuilds.Zone3:FindFirstChild("Parts")
-        if zone3Parts and zone3Parts:GetChildren()[4] then
-            zone3Parts:GetChildren()[4]:Destroy()
-        end
-    end)
-end
-
 --------------------------------------------------------------------------------
 -- MAIN FARMING LOOP
 --------------------------------------------------------------------------------
 task.spawn(function()
     while task.wait(0.5) do
         if AutoFarmEnabled then
-            -- Pastikan tembok langsung dihapus saat aktif
-            RemoveTargetWall()
-
+            -- Pastikan Karakter sudah spawned dan ter-load sempurna
             local hrp, character = GetRootPart()
             if not hrp or not character then
                 task.wait(1)
@@ -250,6 +210,8 @@ task.spawn(function()
             end
 
             local availableEggs = GetAvailableEggs()
+             
+            -- Filter target eggs
             local targetPool = {}
             if SelectedZone == "All / Random" then
                 for _, eggData in ipairs(availableEggs) do
@@ -269,7 +231,7 @@ task.spawn(function()
 
                 if targetPart then
                     ------------------------------------------------------------
-                    -- 1. START: TP ke workspace.Build.Parts:GetChildren()[9]
+                    -- STEP 1: TP ke workspace.Build.Parts:GetChildren()[9]
                     ------------------------------------------------------------
                     local baseParts = Workspace:FindFirstChild("Build") and Workspace.Build:FindFirstChild("Parts")
                     if baseParts then
@@ -278,10 +240,10 @@ task.spawn(function()
                             TeleportTo(targetBasePart.CFrame + Vector3.new(0, 3, 0))
                         end
                     end
-                    task.wait(0.4)
+                    task.wait(0.5)
 
                     ------------------------------------------------------------
-                    -- 2. TP ke Egg, Swing, & Prompt (Ambil Egg)
+                    -- STEP 2: Equip Pickaxe & TP ke Target Egg
                     ------------------------------------------------------------
                     EquipPickaxe()
                     task.wait(0.2)
@@ -291,8 +253,11 @@ task.spawn(function()
                     elseif targetPart:IsA("Model") and targetPart.PrimaryPart then
                         TeleportTo(targetPart.PrimaryPart.CFrame + Vector3.new(0, 3, 0))
                     end
-                    task.wait(0.3)
+                    task.wait(0.4)
 
+                    ------------------------------------------------------------
+                    -- STEP 3: Auto Swing & Tunggu Prompt (Steal Egg)
+                    ------------------------------------------------------------
                     if PickaxeController and PickaxeController.Swing then
                         pcall(function() PickaxeController.Swing(chosenEgg) end)
                     elseif AutoSwingController and AutoSwingController.SetOn then
@@ -301,6 +266,7 @@ task.spawn(function()
 
                     local promptFound = false
                     local startTime = tick()
+                     
                     repeat
                         task.wait(0.2)
                         local promptAnchor = Workspace:FindFirstChild("PromptAnchor")
@@ -314,22 +280,10 @@ task.spawn(function()
                         end
                     until promptFound or (tick() - startTime > 12)
 
-                    task.wait(0.6)
-
-                    ------------------------------------------------------------
-                    -- 3. TP ke Koordinat (-378.57, 0.50, -110.97)
-                    ------------------------------------------------------------
-                    TeleportTo(CFrame.new(-378.57, 0.50, -110.97))
-                    task.wait(0.8)
-
-                    -- Drop Egg di koordinat tersebut & Ambil lagi
-                    TriggerDropCarried()
-                    task.wait(1.0)
-                    FireNearestPrompt()
                     task.wait(0.8)
 
                     ------------------------------------------------------------
-                    -- 4. TP ke Base Player
+                    -- STEP 4: Teleport Kembali ke Base Player
                     ------------------------------------------------------------
                     local playerBaseHitbox = OwnBase.Hitbox()
                     if playerBaseHitbox then
@@ -342,14 +296,46 @@ task.spawn(function()
                     end
                     task.wait(0.8)
 
-                    -- Drop Egg di Base & Ambil lagi di Base
+                    ------------------------------------------------------------
+                    -- STEP 5: Drop Egg di Base & Ambil Kembali via Prompt
+                    ------------------------------------------------------------
                     TriggerDropCarried()
-                    task.wait(1.0)
-                    FireNearestPrompt()
-                    task.wait(1.0)
+                    task.wait(1.2) -- Jeda santai agar egg ter-drop sempurna di base
+
+                    -- Cari ProximityPrompt dari Egg yang di-drop di sekitar base / prompt anchor
+                    local pickupPromptFound = false
+                    local pickupStartTime = tick()
+
+                    repeat
+                        task.wait(0.2)
+                        -- Cek PromptAnchor atau ProximityPrompt terdekat
+                        local promptAnchor = Workspace:FindFirstChild("PromptAnchor")
+                        if promptAnchor then
+                            local prompt = promptAnchor:FindFirstChildWhichIsA("ProximityPrompt") or promptAnchor:FindFirstChild("StealPrompt")
+                            if prompt then
+                                pickupPromptFound = true
+                                fireproximityprompt(prompt)
+                                break
+                            end
+                        end
+
+                        -- Fallback cari prompt langsung dari workspace / egg model
+                        for _, desc in ipairs(Workspace:GetDescendants()) do
+                            if desc:IsA("ProximityPrompt") and desc.Enabled then
+                                local parentPart = desc.Parent
+                                if parentPart and (parentPart.Position - hrp.Position).Magnitude < 15 then
+                                    pickupPromptFound = true
+                                    fireproximityprompt(desc)
+                                    break
+                                end
+                            end
+                        end
+                    until pickupPromptFound or (tick() - pickupStartTime > 6)
+
+                    task.wait(1.0) -- Jeda santai setelah ambil egg di base
 
                     ------------------------------------------------------------
-                    -- 5. Reset / Respawn Karakter & Ulangi Siklus
+                    -- STEP 6: Reset / Respawn Karakter Santai
                     ------------------------------------------------------------
                     local currentChar = LocalPlayer.Character
                     if currentChar then
@@ -359,8 +345,12 @@ task.spawn(function()
                         end
                     end
 
+                    -- Tunggu karakter respawn selesai penuh
                     LocalPlayer.CharacterAdded:Wait()
-                    task.wait(2.0)
+                    local newRoot = LocalPlayer.Character:WaitForChild("HumanoidRootPart", 10)
+                    
+                    -- Delay aman 2.5 detik agar status character stabil sebelum mengulang loop
+                    task.wait(2.5)
                 end
             end
         end
@@ -384,7 +374,7 @@ local MainTab = Window:Tab({
 
 MainTab:Toggle({
     Title = "Auto Steal & Return",
-    Desc = "Start -> Egg -> Koor Drop/Pick -> Base Drop/Pick -> Reset",
+    Desc = "TP Start -> TP Egg -> Steal -> TP Base -> Drop & Pick Egg -> Reset",
     Icon = "play",
     Type = "Checkbox",
     Value = false,
