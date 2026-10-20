@@ -1,3 +1,4 @@
+
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
 -- 1. Buat Tema "Black Green"
@@ -5,16 +6,16 @@ WindUI:AddTheme({
     Name = "Black Green",
     
     Accent = Color3.fromHex("#22c55e"),            -- Hijau Neon
-    Background = Color3.fromHex("#050505"),        -- Hitam Pekat
+    Background = Color3.fromHex("#050505"),         -- Hitam Pekat
     BackgroundTransparency = 0,
-    WindowBackground = Color3.fromHex("#0a0a0a"),  -- Hitam UI
+    WindowBackground = Color3.fromHex("#0a0a0a"),   -- Hitam UI
     
-    Outline = Color3.fromHex("#22c55e"),           -- Border Hijau
+    Outline = Color3.fromHex("#22c55e"),            -- Border Hijau
     WindowShadow = Color3.fromHex("#000000"),
     
-    Text = Color3.fromHex("#ffffff"),              -- Teks Putih
+    Text = Color3.fromHex("#ffffff"),               -- Teks Putih
     Placeholder = Color3.fromHex("#737373"),
-    Icon = Color3.fromHex("#22c55e"),              -- Icon Hijau
+    Icon = Color3.fromHex("#22c55e"),               -- Icon Hijau
     Hover = Color3.fromHex("#ffffff"),
     
     WindowTopbarTitle = Color3.fromHex("#ffffff"),
@@ -23,17 +24,17 @@ WindUI:AddTheme({
     WindowTopbarButtonIcon = Color3.fromHex("#a3a3a3"),
     
     TabBackground = Color3.fromHex("#141414"),
-    TabTitle = Color3.fromHex("#ffffff"),          -- Judul Tab Putih
+    TabTitle = Color3.fromHex("#ffffff"),           -- Judul Tab Putih
     TabIcon = Color3.fromHex("#22c55e"),
     
     ElementBackground = Color3.fromHex("#171717"), -- Kartu Tombol/Toggle
-    ElementTitle = Color3.fromHex("#ffffff"),      -- Judul Element Putih
+    ElementTitle = Color3.fromHex("#ffffff"),       -- Judul Element Putih
     ElementDesc = Color3.fromHex("#a3a3a3"),
     ElementIcon = Color3.fromHex("#22c55e"),
     
     Button = Color3.fromHex("#222222"),
     Toggle = Color3.fromHex("#222222"),
-    ToggleBar = Color3.fromHex("#22c55e"),         -- Indikator Toggle Hijau
+    ToggleBar = Color3.fromHex("#22c55e"),          -- Indikator Toggle Hijau
     Checkbox = Color3.fromHex("#222222"),
     CheckboxIcon = Color3.fromHex("#ffffff"),
     Slider = Color3.fromHex("#222222"),
@@ -61,8 +62,8 @@ local Window = WindUI:CreateWindow({
     MinSize = Vector2.new(560, 350),
     MaxSize = Vector2.new(850, 560),
     ToggleKey = Enum.KeyCode.LeftShift,
-    Transparent = false,             -- Di-set false agar warna background tidak tembus/terpengaruh transparansi
-    Theme = "Black Green",           -- <--- NAMA TEMA DARI WindUI:AddTheme
+    Transparent = false,               -- Di-set false agar warna background tidak tembus/terpengaruh transparansi
+    Theme = "Black Green",             -- <--- NAMA TEMA DARI WindUI:AddTheme
     Resizable = true,
     SideBarWidth = 200,
     HideSearchBar = true,
@@ -109,7 +110,6 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 local autoFishEnabled = false
-local autoClaimEnabled = false
 local autoSellEnabled = false
 local autoCheckpointEnabled = false -- Status Toggle Auto Checkpoint Loop
 
@@ -118,7 +118,7 @@ local castDelay = 0.3       -- Jeda dari melempar hingga minigame aktif
 local reelingDuration = 1.8 -- Durasi waktu spam tap saat menarik ikan agar bar penuh
 local loopDelay = 0.4       -- Jeda antar putaran mancing
 local cpDelay = 0.5         -- Jeda antar checkpoint (dapat di-setting)
-local summitWaitTime = 5.0  -- Jeda di koordinat ekstra setelah summit sebelum mengulang dari CP 1 (dapat di-setting)
+local summitWaitTime = 5.0  -- Jeda di koordinat ekstra sebelum summit sebelum mengulang dari CP 1 (dapat di-setting)
 
 -- Daftar Koordinat Tetap Checkpoint 1 - 20 & Summit
 local CheckpointCoords = {
@@ -309,24 +309,6 @@ task.spawn(function()
     end
 end)
 
--- // Background Loop Auto Claim Inventory (Ambil Semua)
-task.spawn(function()
-    while true do
-        if autoClaimEnabled then
-            pcall(function()
-                local remoteFolder = ReplicatedStorage:FindFirstChild("Remote")
-                local inventarisFolder = remoteFolder and remoteFolder:FindFirstChild("Inventaris")
-                local ambilSemua = inventarisFolder and inventarisFolder:FindFirstChild("AmbilSemua")
-            
-                if ambilSemua then
-                    ambilSemua:InvokeServer()
-                end
-            end)
-        end
-        task.wait(2.5)
-    end
-end)
-
 -- // Background Loop Auto Sell Berdasarkan Timer
 task.spawn(function()
     while true do
@@ -392,21 +374,6 @@ TabMain:Toggle({
         WindUI:Notify({
             Title = "Auto Fish",
             Content = state and "Diaktifkan!" or "Dimatikan!",
-            Duration = 2,
-        })
-    end
-})
-
-TabMain:Toggle({
-    Title = "Auto Claim Inventory (Ambil Semua)",
-    Desc = "Otomatis mengambil hasil tangkapan ikan secara berkala",
-    Icon = "package",
-    Value = false,
-    Callback = function(state) 
-        autoClaimEnabled = state
-        WindUI:Notify({
-            Title = "Auto Claim",
-            Content = state and "Auto Ambil Semua Aktif!" or "Auto Ambil Semua Mati!",
             Duration = 2,
         })
     end
